@@ -11,7 +11,7 @@ import pickle
 import argparse
 import numpy as np
 from scipy.io import loadmat
-from bbox import bbox_overlaps
+from .bbox import bbox_overlaps
 from IPython import embed
 
 
@@ -224,9 +224,16 @@ def voc_ap(rec, prec):
     return ap
 
 
-def evaluation(pred, gt_path, iou_thresh=0.5):
-    import ipdb; ipdb.set_trace(context=10)
-    pred = get_preds(pred)
+def evaluation(pred,
+               writer,
+               iteration,
+               job="Val",
+               gt_path="widerface_evaluate/ground_truth", 
+               iou_thresh=0.5,
+               ):
+    if not isinstamce(pred, dict):
+        pred = get_preds(pred)
+    
     norm_score(pred)
     facebox_list, event_list, file_list, hard_gt_list, medium_gt_list, easy_gt_list = get_gt_boxes(gt_path)
     event_num = len(event_list)
@@ -280,6 +287,9 @@ def evaluation(pred, gt_path, iou_thresh=0.5):
     print("Medium Val AP: {}".format(aps[1]))
     print("Hard   Val AP: {}".format(aps[2]))
     print("=================================================")
+    writer.add_scalar('{}/easy_ap'.format(job), aps[0], iteration)
+    writer.add_scalar('{}/medium_ap'.format(job), aps[1], iteration)
+    writer.add_scalar('{}/hard_ap'.format(job), aps[2], iteration)
 
 
 if __name__ == '__main__':

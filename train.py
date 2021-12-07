@@ -16,6 +16,7 @@ import datetime
 import os
 import math
 from models.retinaface import RetinaFace
+from utils import test
 
 parser = argparse.ArgumentParser(description='Retinaface Training')
 # Training args
@@ -124,6 +125,9 @@ def train():
     else:
         start_iter = 0
 
+    while True:
+        test(net, writer, args, iteration)
+
     for iteration in range(start_iter, max_iter):
         if iteration % epoch_size == 0:
             # create batch iterator
@@ -131,7 +135,7 @@ def train():
             if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 == 0 and epoch > cfg['decay1']):
                 save_path = save_folder + cfg['name']+ '_epoch_' + str(epoch) + '.pth'
                 torch.save(net.state_dict(), save_path)
-                eval(save_path)
+                test(net, writer, args, iteration)
 
             epoch += 1
 
@@ -164,8 +168,6 @@ def train():
     torch.save(net.state_dict(), save_folder + cfg['name'] + '_Final.pth')
     # torch.save(net.state_dict(), save_folder + 'Final_Retinaface.pth')
 
-def eval(model_save_path):
-    os.system(f"sh scripts/")
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
     """Sets the learning rate

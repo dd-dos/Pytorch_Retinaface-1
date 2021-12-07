@@ -1,6 +1,19 @@
 import torch
+from widerface_evaluate import evaluation
+import os
+import argparse
+import torch
+import torch.backends.cudnn as cudnn
+import numpy as np
+from data import cfg_mnet, cfg_re50
+from layers.functions.prior_box import PriorBox
+from .nms import py_cpu_nms
+import cv2
+from models.retinaface import RetinaFace
+from .box_utils import decode, decode_landm
+from .timer import Timer
 
-def test(net, writer, args, iteration, job='Eval'):
+def test(net, writer, args, iteration, job='Val'):
     torch.set_grad_enabled(False)
 
     cfg = None
@@ -10,7 +23,6 @@ def test(net, writer, args, iteration, job='Eval'):
         cfg = cfg_re50
     # net and model
     net.eval()
-    print('Finished loading model!')
     cudnn.benchmark = True
     device = torch.device("cpu" if args.cpu else "cuda")
     net = net.to(device)
@@ -103,27 +115,22 @@ def test(net, writer, args, iteration, job='Eval'):
         _t['misc'].toc()
 
         # --------------------------------------------------------------------
-        # save_name = args.save_folder + img_name[:-4] + ".txt"
-        # dirname = os.path.dirname(save_name)
-        # if not os.path.isdir(dirname):
-        #     os.makedirs(dirname)
-        # with open(save_name, "w") as fd:
-        #     bboxs = dets
-        #     file_name = os.path.basename(save_name)[:-4] + "\n"
-        #     bboxs_num = str(len(bboxs)) + "\n"
-        #     fd.write(file_name)
-        #     fd.write(bboxs_num)
-        #     for box in bboxs:
-        #         x = int(box[0])
-        #         y = int(box[1])
-        #         w = int(box[2]) - int(box[0])
-        #         h = int(box[3]) - int(box[1])
-        #         confidence = str(box[4])
-        #         line = str(x) + " " + str(y) + " " + str(w) + " " + str(h) + " " + confidence + " \n"
-        #         fd.write(line)
-        
+        base_name, real_name = img_name[:-4].split('/')
+        if base_name not in pred.keys():
+            pred[base_name] = {}
 
-        print('im_detect: {:d}/{:d} forward_pass_time: {:.4f}s misc: {:.4f}s'.format(i + 1, num_images, _t['forward_pass'].average_time, _t['misc'].average_time))
+        box_list = []
+        for box in bboxs:
+            x = int(box[0])
+            y = int(box[1])
+            w = int(box[2]) - int(box[0])
+            h = int(box[3]) - int(box[1])
+            confidence = str(box[4])
+            
+            re_box = np.array([x,y,w,h,confidence])
+            box_list.append(re_box)
+            
+        pred[base_name][real_name] = np.array(box_list)
 
         # save image
         if args.save_image:
@@ -139,13 +146,6 @@ def test(net, writer, args, iteration, job='Eval'):
                 cv2.putText(img_raw, text, (cx, cy),
                             cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
 
-                # landms
-                cv2.circle(img_raw, (b[5], b[6]), 1, (0, 0, 255), 4)
-                cv2.circle(img_raw, (b[7], b[8]), 1, (0, 255, 255), 4)
-                cv2.circle(img_raw, (b[9], b[10]), 1, (255, 0, 255), 4)
-                cv2.circle(img_raw, (b[11], b[12]), 1, (0, 255, 0), 4)
-                cv2.circle(img_raw, (b[13], b[14]), 1, (255, 0, 0), 4)
-                
             # save image
             comparision = np.hstack((original_img, img_raw))
             tensor_img = torch.tensor(comparision.transpose(2,0,1)/255.,
@@ -153,3 +153,4 @@ def test(net, writer, args, iteration, job='Eval'):
             grid = torchvision.utils.make_grid(tensor_img)
             writer.add_image(f"{job}/sample-{idx}", grid, iteration)
 
+    evaluation(pred, writer, iteration)
