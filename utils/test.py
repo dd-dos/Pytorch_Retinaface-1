@@ -5,27 +5,20 @@ import argparse
 import torch
 import torch.backends.cudnn as cudnn
 import numpy as np
-from data import cfg_mnet, cfg_re50
-from layers.functions.prior_box import PriorBox
 from .nms import py_cpu_nms
 import cv2
-from models.retinaface import RetinaFace
 from .box_utils import decode, decode_landm
 from .timer import Timer
+import tqdm
 
-def test(net, writer, args, iteration, job='Val'):
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def test(net, writer, args, cfg, PriorBox, iteration, job='Val'):
     torch.set_grad_enabled(False)
 
-    cfg = None
-    if args.network == "mobile0.25":
-        cfg = cfg_mnet
-    elif args.network == "resnet50":
-        cfg = cfg_re50
     # net and model
     net.eval()
     cudnn.benchmark = True
-    device = torch.device("cpu" if args.cpu else "cuda")
-    net = net.to(device)
 
     # testing dataset
     testset_folder = args.dataset_folder
@@ -35,11 +28,10 @@ def test(net, writer, args, iteration, job='Val'):
         test_dataset = fr.read().split()
     num_images = len(test_dataset)
 
-    _t = {'forward_pass': Timer(), 'misc': Timer()}
-
     # testing begin
     pred = {}
-    for i, img_name in enumerate(test_dataset):
+    print("Testing...")
+    for i, img_name in tqdm.tqdm(enumerate(test_dataset), total=len(test_dataset)):
         image_path = testset_folder + img_name
         img_raw = cv2.imread(image_path, cv2.IMREAD_COLOR)
         img = np.float32(img_raw)
@@ -67,10 +59,7 @@ def test(net, writer, args, iteration, job='Val'):
         img = img.to(device)
         scale = scale.to(device)
 
-        _t['forward_pass'].tic()
         loc, conf, landms = net(img)  # forward pass
-        _t['forward_pass'].toc()
-        _t['misc'].tic()
         priorbox = PriorBox(cfg, image_size=(im_height, im_width))
         priors = priorbox.forward()
         priors = priors.to(device)
@@ -112,15 +101,14 @@ def test(net, writer, args, iteration, job='Val'):
         # landms = landms[:args.keep_top_k, :]
 
         dets = np.concatenate((dets, landms), axis=1)
-        _t['misc'].toc()
 
         # --------------------------------------------------------------------
-        base_name, real_name = img_name[:-4].split('/')
+        _, base_name, real_name = img_name[:-4].split('/')
         if base_name not in pred.keys():
             pred[base_name] = {}
 
         box_list = []
-        for box in bboxs:
+        for box in dets:
             x = int(box[0])
             y = int(box[1])
             w = int(box[2]) - int(box[0])

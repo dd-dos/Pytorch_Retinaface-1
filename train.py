@@ -30,9 +30,9 @@ parser.add_argument('--resume_epoch', default=0, type=int, help='resume iter for
 parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay for SGD')
 parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD')
 parser.add_argument('--save_folder', default='./weights/', help='Location to save checkpoint models')
+parser.add_argument('--clearml', action="store_true", default=False, help='logging with clearml')
 # Testing args
 parser.add_argument('--origin_size', default=True, type=str, help='Whether use origin image size to evaluate')
-parser.add_argument('--save_folder', default='./widerface_evaluate/widerface_txt/', type=str, help='Dir to save txt results')
 parser.add_argument('--cpu', action="store_true", default=False, help='Use cpu inference')
 parser.add_argument('--dataset_folder', default='./data/widerface/val/images/', type=str, help='dataset path')
 parser.add_argument('--confidence_threshold', default=0.02, type=float, help='confidence_threshold')
@@ -73,8 +73,6 @@ training_dataset = args.training_dataset
 save_folder = args.save_folder
 
 net = RetinaFace(cfg=cfg)
-print("Printing net...")
-print(net)
 
 if args.resume_net is not None:
     print('Loading resume network...')
@@ -126,7 +124,8 @@ def train():
         start_iter = 0
 
     while True:
-        test(net, writer, args, iteration)
+        print("#################")
+        test(net, writer, args, cfg, PriorBox, 0)
 
     for iteration in range(start_iter, max_iter):
         if iteration % epoch_size == 0:
@@ -135,7 +134,7 @@ def train():
             if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 == 0 and epoch > cfg['decay1']):
                 save_path = save_folder + cfg['name']+ '_epoch_' + str(epoch) + '.pth'
                 torch.save(net.state_dict(), save_path)
-                test(net, writer, args, iteration)
+                test(net, writer, args, cfg, PriorBox, iteration)
 
             epoch += 1
 
