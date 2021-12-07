@@ -225,6 +225,7 @@ def voc_ap(rec, prec):
 
 
 def evaluation(pred, gt_path, iou_thresh=0.5):
+    import ipdb; ipdb.set_trace(context=10)
     pred = get_preds(pred)
     norm_score(pred)
     facebox_list, event_list, file_list, hard_gt_list, medium_gt_list, easy_gt_list = get_gt_boxes(gt_path)

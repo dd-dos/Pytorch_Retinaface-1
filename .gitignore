@@ -1,0 +1,10 @@
+*.zip
+data/widerface
+*.pyc
+widerface_evaluate/widerface_txt
+*.so
+*.o
+*.tar
+*.pth
+*.c
+results
